@@ -1,233 +1,235 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mi-IA</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; font-family: sans-serif; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat IA - RAG Local con Partículas</title>
+    <style>
+        /* Estilos base */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121214;
+            color: #ffffff;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
 
-    canvas {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      cursor: none;
-    }
+        /* ── EL CONTENEDOR DE LAS PARTÍCULAS ── */
+        #particles-js {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1; /* Queda al fondo */
+        }
 
-    /* ── UI encima del canvas ── */
-    .ui {
-      position: relative;
-      z-index: 10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      color: #fff;
-      gap: 16px;
-    }
+        /* Contenedor del Chat flotando sobre las partículas */
+        .chat-container {
+            position: relative;
+            z-index: 2; /* Queda por encima de las partículas */
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            background: rgba(26, 26, 30, 0.85); /* Un poco transparente para ver el fondo */
+            backdrop-filter: blur(8px); /* Efecto cristal esmerilado */
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #2c2c35;
+            margin: 10vh auto; /* Centrado en la pantalla */
+        }
 
-    h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.5px; }
-    p  { font-size: 1rem; color: rgba(255,255,255,0.55); }
+        .chat-header {
+            padding: 15px 20px;
+            background: #202024;
+            border-bottom: 1px solid #2c2c35;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #00ff88;
+        }
 
-    .search {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 8px;
-      padding: 10px 16px;
-      width: 480px;
-      max-width: 90vw;
-    }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
 
-    .search input {
-      background: none;
-      border: none;
-      outline: none;
-      color: #fff;
-      font-size: 0.95rem;
-      flex: 1;
-    }
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 8px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
 
-    .search input::placeholder { color: rgba(255,255,255,0.35); }
+        .user-message {
+            background: #00ff88;
+            color: #121214;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+            font-weight: 500;
+        }
 
-    .search button {
-      background: rgba(255,255,255,0.12);
-      border: none;
-      border-radius: 6px;
-      color: #fff;
-      padding: 6px 12px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background 0.2s;
-    }
+        .ia-message {
+            background: #2c2c35;
+            color: #ffffff;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #3f3f4e;
+        }
 
-    .search button:hover { background: rgba(255,255,255,0.22); }
-  </style>
+        .loading-message {
+            color: #8a8a93;
+            font-style: italic;
+            align-self: flex-start;
+            font-size: 0.9em;
+        }
+
+        .chat-input-area {
+            padding: 15px 20px;
+            background: #202024;
+            border-top: 1px solid #2c2c35;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            background: #121214;
+            border: 1px solid #2c2c35;
+            border-radius: 6px;
+            color: white;
+            font-size: 1em;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #00ff88;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: #00ff88;
+            color: #121214;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #00cc6a;
+        }
+    </style>
 </head>
 <body>
 
-<canvas id="canvas"></canvas>
+    <div id="particles-js"></div>
 
-<div class="ui">
-  <h1>Mi IA</h1>
-  <p>IA basada en RAG</p>
-  <div class="search">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-    <input type="text" placeholder="Search for anything..." />
-    <button>→</button>
-  </div>
-</div>
+    <div class="chat-container">
+        <div class="chat-header">🤖 Asistente RAG Local (Modo Estricto)</div>
+        <div class="chat-messages" id="chatBox">
+            <div class="message ia-message">¡Hola, Pablo! Las partículas ya volvieron a su lugar. Hazme cualquier pregunta basada en tus datos.</div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="userInput" placeholder="Escribe tu pregunta aquí..." autocomplete="off">
+            <button id="sendBtn">Enviar</button>
+        </div>
+    </div>
 
-<script>
-(function () {
-  const canvas = document.getElementById('canvas');
-  const ctx    = canvas.getContext('2d');
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
-  const DOTS        = 100;   /* número de partículas          */
-  const CONNECT_R   = 140;   /* radio de conexión entre puntos */
-  const MOUSE_R     = 130;   /* radio de atracción al cursor   */
+    <script>
+// ── 2. CONFIGURACIÓN COMPLETA DE LOS PUNTITOS ORIGINALES (CORREGIDO) ──
+        particlesJS("particles-js", {
+            "particles": {
+                "number": { "value": 80, "density": { "enable": true, "value_area": 800 } },
+                "color": { "value": "#00ff88" }, /* Color verde neón a juego */
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.5, "random": false },
+                "size": { "value": 3, "random": true },
+                "line_linked": { "enable": true, "distance": 150, "color": "#00ff88", "opacity": 0.4, "width": 1 },
+                "move": { "enable": true, "speed": 2, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": { "enable": true, "mode": "grab" }, /* CAMBIADO: Ahora crea enlaces con el ratón */
+                    "onclick": { "enable": true, "mode": "push" },    /* Creas más al hacer clic */
+                    "resize": true
+                },
+                "modes": {
+                    "grab": {
+                        "distance": 180, /* Qué tan lejos se estiran los enlaces hacia tu ratón */
+                        "line_linked": { "opacity": 0.8 } /* Intensidad del brillo del enlace */
+                    }
+                }
+            },
+            "retina_detect": true
+        });
 
-  let W, H, dots = [];
-  const mouse = { x: -9999, y: -9999 };
+        // ── 3. LÓGICA DEL CHAT CON EL BACKEND ──
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
 
-  /* ── Resize ── */
-  function resize() {
-    W = canvas.width  = window.innerWidth  * devicePixelRatio;
-    H = canvas.height = window.innerHeight * devicePixelRatio;
-    canvas.style.width  = window.innerWidth  + 'px';
-    canvas.style.height = window.innerHeight + 'px';
-  }
+        async function enviarPreguntaALaIA(textoPregunta) {
+            const loadingId = mostrarMensajeEnPantalla('Buscando en la base de datos...', 'loading-message');
 
-  /* ── Crear punto ── */
-  function mkDot() {
-    return {
-      x : Math.random() * W,
-      y : Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.45,
-      vy: (Math.random() - 0.5) * 0.45,
-      r : Math.random() * 1.5 + 1
-    };
-  }
+            try {
+                const response = await fetch('http://localhost:5000/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: textoPregunta })
+                });
 
-  /* ── Init ── */
-  function init() {
-    resize();
-    dots = Array.from({ length: DOTS }, mkDot);
-  }
+                document.getElementById(loadingId).remove();
 
-  /* ── Distancia ── */
-  function d(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
+                if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                const data = await response.json();
+                mostrarMensajeEnPantalla(data.answer, 'ia-message');
 
-  /* ── Frame ── */
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    /* mover partículas */
-    for (const p of dots) {
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.x < 0 || p.x > W) p.vx *= -1;
-      if (p.y < 0 || p.y > H) p.vy *= -1;
-    }
-
-    /* líneas entre partículas cercanas */
-    for (let i = 0; i < dots.length; i++) {
-      const a = dots[i];
-      for (let j = i + 1; j < dots.length; j++) {
-        const b  = dots[j];
-        const dd = d(a.x, a.y, b.x, b.y);
-        if (dd < CONNECT_R) {
-          const alpha = (1 - dd / CONNECT_R) * 0.22;
-          ctx.beginPath();
-          ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-          ctx.lineWidth   = 0.5;
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.stroke();
+            } catch (error) {
+                console.error('Hubo un problema:', error);
+                document.getElementById(loadingId).remove();
+                mostrarMensajeEnPantalla('Error al conectar con el servidor.', 'ia-message');
+            }
         }
-      }
-    }
 
-    /* puntos + líneas al cursor */
-    for (const p of dots) {
-      const dm = d(p.x, p.y, mouse.x, mouse.y);
+        function mostrarMensajeEnPantalla(texto, clase) {
+            const mensajeDiv = document.createElement('div');
+            const idUnico = 'msg-' + Date.now();
+            mensajeDiv.id = idUnico;
+            mensajeDiv.classList.add('message', clase);
+            mensajeDiv.innerText = texto;
+            chatBox.appendChild(mensajeDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return idUnico;
+        }
 
-      if (dm < MOUSE_R) {
-        /* línea con degradado hacia el cursor */
-        const alpha = (1 - dm / MOUSE_R) * 0.9;
-        const g     = ctx.createLinearGradient(p.x, p.y, mouse.x, mouse.y);
-        g.addColorStop(0, `rgba(255,255,255,${alpha})`);
-        g.addColorStop(1, `rgba(160,200,255,${alpha * 0.3})`);
+        function procesarEnvio() {
+            const texto = userInput.value.trim();
+            if (texto === '') return;
+            mostrarMensajeEnPantalla(texto, 'user-message');
+            userInput.value = '';
+            enviarPreguntaALaIA(texto);
+        }
 
-        ctx.beginPath();
-        ctx.strokeStyle = g;
-        ctx.lineWidth   = 1;
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(mouse.x, mouse.y);
-        ctx.stroke();
-
-        /* punto iluminado */
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r + 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(210,225,255,${alpha})`;
-        ctx.fill();
-      } else {
-        /* punto normal */
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.65)';
-        ctx.fill();
-      }
-    }
-
-    /* cursor personalizado */
-    if (mouse.x > 0) {
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-      ctx.lineWidth   = 1;
-      ctx.stroke();
-    }
-
-    requestAnimationFrame(draw);
-  }
-
-  /* ── Eventos ── */
-  window.addEventListener('resize', () => { resize(); });
-
-  window.addEventListener('mousemove', e => {
-    const dpr  = devicePixelRatio;
-    mouse.x = e.clientX * dpr;
-    mouse.y = e.clientY * dpr;
-  });
-
-  window.addEventListener('mouseleave', () => {
-    mouse.x = -9999;
-    mouse.y = -9999;
-  });
-
-  window.addEventListener('touchmove', e => {
-    e.preventDefault();
-    const dpr = devicePixelRatio;
-    mouse.x   = e.touches[0].clientX * dpr;
-    mouse.y   = e.touches[0].clientY * dpr;
-  }, { passive: false });
-
-  init();
-  draw();
-})();
-</script>
+        sendBtn.addEventListener('click', procesarEnvio);
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') procesarEnvio();
+        });
+    </script>
 </body>
 </html>
