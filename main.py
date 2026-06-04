@@ -2,14 +2,13 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Imports modernos y estables para RAG
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import OllamaEmbeddings
 from langchain_chroma import Chroma
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM, OllamaEmbeddings
 
 app = FastAPI()
 
@@ -42,15 +41,14 @@ docs = loader.load()
 # Fragmentar el texto en trozos óptimos para el modelo
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 chunks = text_splitter.split_documents(docs)
-
-# Configurar el generador de vectores (Embeddings) usando Ollama
+# Configurar el generador de vectores (Embeddings) usando el conector moderno
 embeddings = OllamaEmbeddings(model=MODEL_NAME)
 
-# Crear la base de datos vectorial en memoria con nuestros documentos
+# Crear la base de datos vectorial en memoria
 vector_store = Chroma.from_documents(chunks, embeddings)
-retriever = vector_store.as_retriever(search_kwargs={"k": 3}) # Recupera los 3 fragmentos más relevantes
+retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
-# ── PROMPT ESTRICTO (La clave de tu petición) ──
+# ── PROMPT ESTRICTO ──
 system_prompt = (
     "Eres un asistente virtual estricto. Tu única tarea es responder preguntas basándote "
     "exclusivamente en el contexto proporcionado abajo.\n"
@@ -66,13 +64,14 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}"),
 ])
 
-# Inicializar el modelo de Ollama y las cadenas de ejecución (Chains)
-llm = Ollama(model=MODEL_NAME)
-question_answer_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+# Inicializar el modelo
+llm = OllamaLLM(model=MODEL_NAME)
+
+# Función auxiliar para formatear los documentos recuperados
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
 
 print("¡Backend del RAG listo y desplegado!")
-
 # ── ENDPOINTS DE LA API ──
 class QueryRequest(BaseModel):
     question: str
@@ -80,12 +79,14 @@ class QueryRequest(BaseModel):
 @app.post("/query")
 async def query_ia(request: QueryRequest):
     try:
-        # Ejecutar la búsqueda en los documentos y enviarla al LLM
-        response = rag_chain.invoke({"input": request.question})
-        return {"answer": response["answer"]}
+        # 1. Recuperar los documentos relevantes
+        relevant_docs = retriever.invoke(request.question)
+        context_text = format_docs(relevant_docs)
+        
+        # 2. Unir todo en el prompt y enviarlo al LLM
+        chain = prompt | llm
+        response = chain.invoke({"context": context_text, "input": request.question})
+        
+        return {"answer": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
