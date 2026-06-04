@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi-IA</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; font-family: sans-serif; }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: none;
+    }
+
+    /* ── UI encima del canvas ── */
+    .ui {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      color: #fff;
+      gap: 16px;
+    }
+
+    h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.5px; }
+    p  { font-size: 1rem; color: rgba(255,255,255,0.55); }
+
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 10px 16px;
+      width: 480px;
+      max-width: 90vw;
+    }
+
+    .search input {
+      background: none;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 0.95rem;
+      flex: 1;
+    }
+
+    .search input::placeholder { color: rgba(255,255,255,0.35); }
+
+    .search button {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+
+    .search button:hover { background: rgba(255,255,255,0.22); }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="ui">
+  <h1>Mi IA</h1>
+  <p>IA basada en RAG</p>
+  <div class="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="text" placeholder="Search for anything..." />
+    <button>→</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('canvas');
+  const ctx    = canvas.getContext('2d');
+
+  const DOTS        = 100;   /* número de partículas          */
+  const CONNECT_R   = 140;   /* radio de conexión entre puntos */
+  const MOUSE_R     = 130;   /* radio de atracción al cursor   */
+
+  let W, H, dots = [];
+  const mouse = { x: -9999, y: -9999 };
+
+  /* ── Resize ── */
+  function resize() {
+    W = canvas.width  = window.innerWidth  * devicePixelRatio;
+    H = canvas.height = window.innerHeight * devicePixelRatio;
+    canvas.style.width  = window.innerWidth  + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+  }
+
+  /* ── Crear punto ── */
+  function mkDot() {
+    return {
+      x : Math.random() * W,
+      y : Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.45,
+      vy: (Math.random() - 0.5) * 0.45,
+      r : Math.random() * 1.5 + 1
+    };
+  }
+
+  /* ── Init ── */
+  function init() {
+    resize();
+    dots = Array.from({ length: DOTS }, mkDot);
+  }
+
+  /* ── Distancia ── */
+  function d(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
+
+  /* ── Frame ── */
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    /* mover partículas */
+    for (const p of dots) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+    }
+
+    /* líneas entre partículas cercanas */
+    for (let i = 0; i < dots.length; i++) {
+      const a = dots[i];
+      for (let j = i + 1; j < dots.length; j++) {
+        const b  = dots[j];
+        const dd = d(a.x, a.y, b.x, b.y);
+        if (dd < CONNECT_R) {
+          const alpha = (1 - dd / CONNECT_R) * 0.22;
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+          ctx.lineWidth   = 0.5;
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    /* puntos + líneas al cursor */
+    for (const p of dots) {
+      const dm = d(p.x, p.y, mouse.x, mouse.y);
+
+      if (dm < MOUSE_R) {
+        /* línea con degradado hacia el cursor */
+        const alpha = (1 - dm / MOUSE_R) * 0.9;
+        const g     = ctx.createLinearGradient(p.x, p.y, mouse.x, mouse.y);
+        g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+        g.addColorStop(1, `rgba(160,200,255,${alpha * 0.3})`);
+
+        ctx.beginPath();
+        ctx.strokeStyle = g;
+        ctx.lineWidth   = 1;
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(mouse.x, mouse.y);
+        ctx.stroke();
+
+        /* punto iluminado */
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r + 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(210,225,255,${alpha})`;
+        ctx.fill();
+      } else {
+        /* punto normal */
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.fill();
+      }
+    }
+
+    /* cursor personalizado */
+    if (mouse.x > 0) {
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  /* ── Eventos ── */
+  window.addEventListener('resize', () => { resize(); });
+
+  window.addEventListener('mousemove', e => {
+    const dpr  = devicePixelRatio;
+    mouse.x = e.clientX * dpr;
+    mouse.y = e.clientY * dpr;
+  });
+
+  window.addEventListener('mouseleave', () => {
+    mouse.x = -9999;
+    mouse.y = -9999;
+  });
+
+  window.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const dpr = devicePixelRatio;
+    mouse.x   = e.touches[0].clientX * dpr;
+    mouse.y   = e.touches[0].clientY * dpr;
+  }, { passive: false });
+
+  init();
+  draw();
+})();
+</script>
+</body>
+</html>
