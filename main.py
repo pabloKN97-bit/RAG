@@ -23,7 +23,7 @@ app.add_middleware(
 
 # ── CONFIGURACIÓN DEL RAG ──
 DOCS_DIR = "datos"
-MODEL_NAME = "llama3" 
+MODEL_NAME = "qwen2.5:0.5b" 
 
 if not os.path.exists(DOCS_DIR):
     os.makedirs(DOCS_DIR)

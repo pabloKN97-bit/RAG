@@ -3,4 +3,4 @@ Frontend es lo que se ve, doble click sobre el de momento para arrancarlo
 backend es el main, para arrancarlo se hace env, para ello source env/bin/activate
 python3 -m http-server 8080
 http://127.0.0.1:8080/frontend.html
-
+Se esta usando el modelo qwen2.5:0.5 de 500 parametros, el mas pequeño para poder alojarlo en cualquier ordenador, con un poco mas de hardware se recomienda el 1.5 y con buen hardware se podría pasar a modelos mas completos como llama3

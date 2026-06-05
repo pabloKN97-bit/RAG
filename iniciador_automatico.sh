@@ -4,7 +4,9 @@
 RUTA_PROYECTO="$HOME/proyecto_ia/RAG"
 
 echo " Iniciando el entorno del proyecto RAG..."
-
+gnome-terminal --title="inicio ollama" -- bash -c "
+	ollama run qwen2.5:0.5b
+"
 # 1. Terminal para el BACKEND (Activa el entorno virtual y arranca main.py)
 gnome-terminal --title=" BACKEND (FastAPI/Ollama)" -- bash -c "
     cd '$RUTA_PROYECTO';
