@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat IA - RAG Local con Partículas</title>
+    <title>Chat IA - RAG Local</title>
     <style>
         /* Estilos base */
         body {
@@ -93,12 +93,29 @@
             font-size: 0.9em;
         }
 
+        /* ── ESTILOS PARA LA IMAGEN FIJA SOBRE EL INPUT ── */
+        .bd1-chat-avatar-container {
+            display: flex;
+            justify-content: flex-start; 
+            padding: 0 20px;             
+            margin-bottom: -5px;         
+            z-index: 3;
+        }
+
+        .bd1-chat-avatar {
+            width: 70px;                 
+            height: auto;                
+            image-rendering: pixelated;  
+            filter: drop-shadow(0px -4px 6px rgba(0, 0, 0, 0.3)); 
+        }
+
         .chat-input-area {
             padding: 15px 20px;
             background: #202024;
             border-top: 1px solid #2c2c35;
             display: flex;
             gap: 10px;
+            z-index: 3;
         }
 
         input[type="text"] {
@@ -131,6 +148,41 @@
         button:hover {
             background: #00cc6a;
         }
+
+        /* ── ESTILOS PARA EL GIF DE BD-1 EN LA ESQUINA ── */
+        #bd1-container {
+            position: fixed;
+            bottom: 25px;     
+            right: 25px;
+            width: 80px;       
+            height: 80px;      
+            z-index: 100;      
+            cursor: pointer;   
+            transition: transform 0.2s ease-out;
+            display: block;    
+        }
+
+        #bd1-sprite {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background-color: rgba(0, 255, 136, 0.1); 
+            background-image: url('bd1_idle.gif'); 
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+            image-rendering: pixelated; 
+        }
+
+        /* Al pasar el cursor por encima: cambia al GIF interactivo limpio */
+        #bd1-container:hover #bd1-sprite {
+            background-image: url('bd1_walk.gif'); 
+        }
+
+        /* Al hacer clic sobre él: Da un salto */
+        #bd1-container:active {
+            transform: translateY(-40px) scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -138,54 +190,63 @@
     <div id="particles-js"></div>
 
     <div class="chat-container">
-        <div class="chat-header">🤖 Asistente RAG Local (Modo Estricto)</div>
+        <div class="chat-header">Asistente RAG BD-1</div>
         <div class="chat-messages" id="chatBox">
-            <div class="message ia-message">¡Hola, Pablo! Las partículas ya volvieron a su lugar. Hazme cualquier pregunta basada en tus datos.</div>
+            <div class="message ia-message">BD-1 listo para lo que necesites</div>
         </div>
+
+        <div class="bd1-chat-avatar-container">
+            <img src="BD-1.png" alt="BD-1" class="bd1-chat-avatar">
+        </div>
+
         <div class="chat-input-area">
             <input type="text" id="userInput" placeholder="Escribe tu pregunta aquí..." autocomplete="off">
             <button id="sendBtn">Enviar</button>
         </div>
     </div>
 
+    <div id="bd1-container">
+        <div id="bd1-sprite"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 
     <script>
-// ── 2. CONFIGURACIÓN COMPLETA DE LOS PUNTITOS ORIGINALES (CORREGIDO) ──
+        // ── 1. CONFIGURACIÓN DE LAS PARTÍCULAS SEGUIDORAS ──
         particlesJS("particles-js", {
             "particles": {
-                "number": { "value": 80, "density": { "enable": true, "value_area": 800 } },
-                "color": { "value": "#00ff88" }, /* Color verde neón a juego */
+                "number": { "value": 85, "density": { "enable": true, "value_area": 800 } },
+                "color": { "value": "#00ff88" },
                 "shape": { "type": "circle" },
-                "opacity": { "value": 0.5, "random": false },
+                "opacity": { "value": 0.4, "random": false },
                 "size": { "value": 3, "random": true },
-                "line_linked": { "enable": true, "distance": 150, "color": "#00ff88", "opacity": 0.4, "width": 1 },
-                "move": { "enable": true, "speed": 2, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false }
+                "line_linked": { "enable": true, "distance": 140, "color": "#00ff88", "opacity": 0.35, "width": 1 },
+                "move": { "enable": true, "speed": 1.8, "direction": "none", "random": false, "straight": false, "out_mode": "out", "bounce": false }
             },
             "interactivity": {
                 "detect_on": "canvas",
                 "events": {
-                    "onhover": { "enable": true, "mode": "grab" }, /* CAMBIADO: Ahora crea enlaces con el ratón */
-                    "onclick": { "enable": true, "mode": "push" },    /* Creas más al hacer clic */
+                    "onhover": { "enable": true, "mode": "grab" }, 
+                    "onclick": { "enable": true, "mode": "push" },
                     "resize": true
                 },
                 "modes": {
                     "grab": {
-                        "distance": 180, /* Qué tan lejos se estiran los enlaces hacia tu ratón */
-                        "line_linked": { "opacity": 0.8 } /* Intensidad del brillo del enlace */
+                        "distance": 180,
+                        "line_linked": { "opacity": 0.75 } 
                     }
                 }
             },
             "retina_detect": true
         });
 
-        // ── 3. LÓGICA DEL CHAT CON EL BACKEND ──
+        // ── 2. LÓGICA DE COMUNICACIÓN CON EL BACKEND RAG (PUERTO 5000) ──
         const chatBox = document.getElementById('chatBox');
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
 
         async function enviarPreguntaALaIA(textoPregunta) {
-            const loadingId = mostrarMensajeEnPantalla('Buscando en la base de datos...', 'loading-message');
+            const loadingId = mostrarMensajeEnPantalla('Buscando en tus ficheros...', 'loading-message');
 
             try {
                 const response = await fetch('http://localhost:5000/query', {
@@ -196,14 +257,14 @@
 
                 document.getElementById(loadingId).remove();
 
-                if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                if (!response.ok) throw new Error('Error en el servidor');
                 const data = await response.json();
                 mostrarMensajeEnPantalla(data.answer, 'ia-message');
 
             } catch (error) {
-                console.error('Hubo un problema:', error);
+                console.error('Error:', error);
                 document.getElementById(loadingId).remove();
-                mostrarMensajeEnPantalla('Error al conectar con el servidor.', 'ia-message');
+                mostrarMensajeEnPantalla('Error al conectar con la IA. Asegúrate de tener el backend encendido.', 'ia-message');
             }
         }
 
